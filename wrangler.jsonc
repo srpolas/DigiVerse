@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "digiverse",
+	"compatibility_date": "2026-11-20",
+	"pages_build_output_dir": "./dist",
+	"d1_databases": [
+		{
+			"binding": "CONTROL_DB",
+			"database_name": "digiverse",
+			"database_id": "febd23fb-7680-4e36-8114-f318d9f1385e",
+			"migrations_dir": "migrations/d1"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "SCHOOL_FILES",
+			"bucket_name": "digiverse-school-files"
+		}
+	]
+}
