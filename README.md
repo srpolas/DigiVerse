@@ -21,12 +21,13 @@ D1 does not provide Postgres-style row-level security. Keep D1 private behind Wo
 
 Better Auth creates and checks its required tables programmatically on the first `/api/auth/*` request in a Worker isolate, using its documented Cloudflare D1 migration support. DigiVerse school tables are kept in `migrations/d1/`.
 
-The current dashboard is a visual shell with sample summary values. Sign-in uses Better Auth; school onboarding and data CRUD are the next implementation slice.
+After sign-in, an account without a school membership is guided through first-school setup. The setup API creates the school and assigns the creator the `school_admin` role in one D1 batch. The overview uses the saved school details and clearly shows empty student, class, and attendance totals. Student and class management are the next implementation slice.
 
 ## Current build slice
 
 - DigiVerse workspace shell and dashboard preview.
 - Cloudflare Pages configuration with D1 and R2 bindings.
 - Better Auth email/password sign-in backed by D1.
+- First-school onboarding with school administrator membership stored in D1.
 - Starter school tables for memberships, academic years, classes, sections and students.
 - Health endpoint for checking Cloudflare bindings.

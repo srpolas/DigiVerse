@@ -1,29 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AppSettings from './AppSettings'
 import Login from './Login'
+import SchoolSetup, { type School } from './SchoolSetup'
 import { authClient } from './lib/auth-client'
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Bell, BookOpen, CalendarDays,
-  Check, ChevronDown, CircleHelp, ClipboardCheck, GraduationCap, LayoutDashboard,
-  Menu, MoreHorizontal, Search, Settings2, ShieldCheck, Users, X,
+  ArrowRight, ArrowUpRight, Bell, BookOpen, CalendarDays, CircleHelp,
+  ChevronDown, ClipboardCheck, GraduationCap, LayoutDashboard, Menu, MoreHorizontal,
+  Search, Settings2, Users, X,
 } from 'lucide-react'
 
 const navigation = [
   { label: 'Overview', icon: LayoutDashboard },
-  { label: 'Students', icon: Users, badge: '500' },
+  { label: 'Students', icon: Users },
   { label: 'Attendance', icon: ClipboardCheck },
   { label: 'Academics', icon: BookOpen },
   { label: 'Calendar', icon: CalendarDays },
-]
-
-const attendance = [
-  { day: 'Mon', present: 90, absent: 10 },
-  { day: 'Tue', present: 94, absent: 6 },
-  { day: 'Wed', present: 87, absent: 13 },
-  { day: 'Thu', present: 96, absent: 4 },
-  { day: 'Fri', present: 82, absent: 18 },
-  { day: 'Sat', present: 0, absent: 0 },
-  { day: 'Sun', present: 0, absent: 0 },
 ]
 
 function App() {
@@ -32,9 +23,42 @@ function App() {
   const [notice, setNotice] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const { data: session, isPending } = authClient.useSession()
+  const [schools, setSchools] = useState<School[] | null>(null)
+  const [schoolLoadError, setSchoolLoadError] = useState('')
+  const [schoolLoadAttempt, setSchoolLoadAttempt] = useState(0)
+
+  useEffect(() => {
+    if (!session?.user.id) {
+      setSchools(null)
+      return
+    }
+    let current = true
+    setSchools(null)
+    setSchoolLoadError('')
+    void (async () => {
+      try {
+        const response = await fetch('/api/school')
+        const result = await response.json() as { schools?: School[]; error?: string }
+        if (!response.ok) throw new Error(result.error || 'Could not load your school workspace.')
+        if (current) setSchools(result.schools || [])
+      } catch (cause) {
+        if (current) setSchoolLoadError(cause instanceof Error ? cause.message : 'Could not load your school workspace.')
+      }
+    })()
+    return () => { current = false }
+  }, [session?.user.id, schoolLoadAttempt])
 
   if (isPending) return <main className="login-screen"><div className="login-loading">Opening your DigiVerse workspace…</div></main>
   if (!session) return <Login />
+  if (schoolLoadError) return <main className="login-screen"><div className="workspace-error" role="alert"><strong>Your school workspace didn’t load.</strong><p>{schoolLoadError}</p><button className="primary-button" onClick={() => setSchoolLoadAttempt((attempt) => attempt + 1)}>Try again</button></div></main>
+  if (!schools) return <main className="login-screen"><div className="login-loading">Loading your school workspace…</div></main>
+  if (schools.length === 0) return <SchoolSetup onCreated={(school) => setSchools([school])} />
+
+  const school = schools[0]
+  const firstName = session.user.name.trim().split(/\s+/)[0] || 'there'
+  const today = new Intl.DateTimeFormat('en-BD', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: school.timezone,
+  }).format(new Date())
 
   return (
     <div className="app-shell">
@@ -45,17 +69,17 @@ function App() {
           <button className="icon-button close-menu" aria-label="Close menu" onClick={() => setMenuOpen(false)}><X size={18} /></button>
         </div>
 
-        <button className="school-switcher" aria-label="Select school">
-          <div className="school-avatar">S</div>
-          <span className="school-label"><strong>Sunrise Academy</strong><small>School workspace</small></span>
+        <button className="school-switcher" aria-label="School workspace">
+          <div className="school-avatar">{school.name.slice(0, 1).toUpperCase()}</div>
+          <span className="school-label"><strong>{school.name}</strong><small>{school.role.replace('_', ' ')}</small></span>
           <ChevronDown size={16} className="muted-icon" />
         </button>
 
         <div className="nav-caption">WORKSPACE</div>
         <nav className="main-nav" aria-label="Main navigation">
-          {navigation.map(({ label, icon: Icon, badge }) => (
+          {navigation.map(({ label, icon: Icon }) => (
             <button key={label} className={`nav-link ${active === label ? 'active' : ''}`} onClick={() => setActive(label)}>
-              <Icon size={18} strokeWidth={1.9} /><span>{label}</span>{badge && <small className="nav-badge">{badge}</small>}
+              <Icon size={18} strokeWidth={1.9} /><span>{label}</span>
             </button>
           ))}
         </nav>
@@ -94,97 +118,61 @@ function App() {
               <Bell size={18} /><i />
             </button>
             <div className="topbar-divider" />
-            <div className="today-label"><CalendarDays size={15} /><span>Saturday, 21 November</span></div>
+            <div className="today-label"><CalendarDays size={15} /><span>{today}</span></div>
           </div>
         </header>
 
-        {active === 'Settings' ? <AppSettings /> : <div className="page-wrap">
+        {active === 'Settings' ? <AppSettings /> : active !== 'Overview' ? <section className="settings-page module-placeholder"><div className="settings-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> SCHOOL WORKSPACE</div><h1>{active}</h1><p>This module is being prepared for {school.name}.</p></div></div><div className="settings-card next-module-card"><span className="platform-setting-icon"><ArrowRight size={19} /></span><div><h2>Next up for your school</h2><p>School setup is saved. Student and class management will be added here next.</p></div></div></section> : <div className="page-wrap">
           <section className="welcome-row">
             <div>
-              <div className="eyebrow"><span className="eyebrow-line" /> PREVIEW · SAMPLE SCHOOL DATA</div>
-              <h1>Good morning, <em>Admin.</em></h1>
-              <p className="welcome-copy">Here’s what’s happening across Sunrise Academy today.</p>
+              <div className="eyebrow"><span className="eyebrow-line" /> SCHOOL WORKSPACE</div>
+              <h1>Welcome, <em>{firstName}.</em></h1>
+              <p className="welcome-copy">Your workspace for {school.name} is ready.</p>
             </div>
-            <button className="date-filter"><CalendarDays size={16} /><span>This week</span><ChevronDown size={15} /></button>
+            <div className="workspace-role">{school.role.replace('_', ' ')}</div>
           </section>
 
-          <section className="metric-grid" aria-label="School summary">
+          <section className="metric-grid school-metrics" aria-label="School summary">
             <article className="metric-card metric-students">
-              <div className="metric-top"><span className="metric-icon mint"><Users size={18} /></span><span className="metric-delta positive"><ArrowUpRight size={14} /> 4.2%</span></div>
-              <div className="metric-value">482</div><div className="metric-label">Enrolled students</div>
-              <div className="metric-foot"><span>Across 12 classes</span><span className="sparkline spark-mint"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
+              <div className="metric-top"><span className="metric-icon mint"><Users size={18} /></span></div>
+              <div className="metric-value">{school.studentCount}</div><div className="metric-label">Enrolled students</div>
+              <div className="metric-foot"><span>{school.studentCount === 0 ? 'Ready for your first student' : 'Active student records'}</span></div>
             </article>
             <article className="metric-card">
-              <div className="metric-top"><span className="metric-icon violet"><ClipboardCheck size={18} /></span><span className="metric-delta positive"><ArrowUpRight size={14} /> 1.8%</span></div>
-              <div className="metric-value">94.6<span className="metric-unit">%</span></div><div className="metric-label">Attendance today</div>
-              <div className="metric-foot"><span>456 of 482 present</span><span className="sparkline spark-violet"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
+              <div className="metric-top"><span className="metric-icon violet"><ClipboardCheck size={18} /></span></div>
+              <div className="metric-value">—</div><div className="metric-label">Attendance today</div>
+              <div className="metric-foot"><span>Starts after enrollment</span></div>
             </article>
             <article className="metric-card">
-              <div className="metric-top"><span className="metric-icon amber"><BookOpen size={18} /></span><span className="metric-delta neutral"><ArrowDownRight size={14} /> 2 pending</span></div>
-              <div className="metric-value">18<span className="metric-unit">/</span><span className="metric-subvalue">20</span></div><div className="metric-label">Classes in session</div>
-              <div className="metric-foot"><span>2 classes start at 10:30</span><span className="sparkline spark-amber"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
-            </article>
-            <article className="metric-card metric-highlight">
-              <div className="metric-top"><span className="metric-icon slate"><ShieldCheck size={18} /></span><span className="status-pill"><span />All clear</span></div>
-              <div className="metric-value">0</div><div className="metric-label">Items needing attention</div>
-              <div className="metric-foot"><span>Everything is up to date</span><span className="check-seal"><Check size={13} /></span></div>
+              <div className="metric-top"><span className="metric-icon amber"><BookOpen size={18} /></span></div>
+              <div className="metric-value">{school.classCount}</div><div className="metric-label">Classes</div>
+              <div className="metric-foot"><span>{school.classCount === 0 ? 'Set up classes before enrollment' : 'Class groups configured'}</span></div>
             </article>
           </section>
 
           <section className="content-grid">
             <article className="panel attendance-panel">
               <div className="panel-header">
-                <div><div className="panel-kicker">STUDENT PRESENCE</div><h2>Attendance overview</h2><p>Daily attendance across the school</p></div>
-                <button className="select-control">This week <ChevronDown size={14} /></button>
+                <div><div className="panel-kicker">GETTING STARTED</div><h2>Your school is set up</h2><p>These are the first steps to start using DigiVerse.</p></div>
               </div>
-              <div className="chart-summary"><strong>92.4%</strong><span className="chart-change"><ArrowUpRight size={14} /> 3.1% <span>vs last week</span></span></div>
-              <div className="chart" aria-label="Attendance chart for the week">
-                <div className="chart-guides"><span>100%</span><span>75%</span><span>50%</span><span>25%</span></div>
-                <div className="chart-area">
-                  <div className="guide-lines"><i/><i/><i/><i/></div>
-                  <div className="bars">{attendance.map((item) => <div className={`bar-group ${item.present === 0 ? 'bar-empty' : ''}`} key={item.day}>
-                    <div className="bar-track"><span className="bar-present" style={{ height: `${item.present}%` }} /><span className="bar-absent" style={{ height: `${item.absent}%` }} /></div>
-                    <small>{item.day}</small>
-                  </div>)}</div>
-                </div>
-              </div>
-              <div className="chart-legend"><span><i className="legend-present"/>Present</span><span><i className="legend-absent"/>Absent</span><span className="chart-note">School days only</span></div>
+              <div className="first-steps"><div><span>1</span><p><strong>Create classes and sections</strong><small>Arrange your school’s grade levels.</small></p></div><div><span>2</span><p><strong>Enroll students</strong><small>Add student profiles and guardian details.</small></p></div><div><span>3</span><p><strong>Start taking attendance</strong><small>Record daily presence by class.</small></p></div></div>
             </article>
 
             <article className="panel events-panel">
               <div className="panel-header event-heading">
-                <div><div className="panel-kicker">UP NEXT</div><h2>Today at school</h2><p>Saturday, 21 November</p></div>
-                <button className="icon-button subtle-more" aria-label="More events"><MoreHorizontal size={19} /></button>
+                <div><div className="panel-kicker">SCHOOL DETAILS</div><h2>{school.name}</h2><p>{school.eiin ? `EIIN ${school.eiin}` : 'Education institution'}</p></div>
               </div>
-              <div className="event-list">
-                <div className="event-item">
-                  <div className="event-time"><strong>09:00</strong><small>AM</small></div><div className="event-rule"><i className="rule-dot teal-dot" /></div>
-                  <div className="event-detail"><strong>Morning assembly</strong><span>School grounds · All classes</span><div className="avatar-stack"><i>6</i><i>7</i><i>8</i><small>+9 classes</small></div></div>
-                </div>
-                <div className="event-item">
-                  <div className="event-time"><strong>10:30</strong><small>AM</small></div><div className="event-rule"><i className="rule-dot violet-dot" /></div>
-                  <div className="event-detail"><strong>Mid-term examinations</strong><span>Class 8 · Room 204</span><div className="event-tag"><span /> In progress</div></div>
-                </div>
-                <div className="event-item">
-                  <div className="event-time"><strong>12:15</strong><small>PM</small></div><div className="event-rule last-rule"><i className="rule-dot amber-dot" /></div>
-                  <div className="event-detail"><strong>Parent–teacher meeting</strong><span>Class 5 · Conference room</span><div className="event-people"><div className="mini-avatar">SA</div><span>Samira Akter</span></div></div>
-                </div>
-              </div>
-              <button className="all-events" onClick={() => setActive('Calendar')}>View school calendar <ArrowUpRight size={15} /></button>
+              <div className="school-detail-list"><div><span>Workspace role</span><strong>{school.role.replace('_', ' ')}</strong></div><div><span>Time zone</span><strong>{school.timezone}</strong></div><div><span>School web address</span><strong>{school.slug}</strong></div></div>
             </article>
           </section>
 
           <section className="bottom-grid">
-            <article className="notice-strip">
-              <div className="notice-symbol"><Activity size={18} /></div>
-              <div className="notice-copy"><strong>Your school is off to a good start.</strong><span>Attendance is up 3.1% compared with last week. Keep it going.</span></div>
-              <button aria-label="Dismiss update" onClick={() => setNotice(true)}><X size={16} /></button>
-            </article>
-            <div className="build-note"><span className="live-dot"/> DigiVerse <span>·</span> School overview</div>
+            <article className="notice-strip"><div className="notice-symbol"><BookOpen size={18} /></div><div className="notice-copy"><strong>Next: build your class list.</strong><span>Use Academics to get your structure ready before adding students.</span></div><button onClick={() => setActive('Academics')}>Academics <ArrowRight size={14} /></button></article>
+            <div className="build-note"><span className="live-dot"/> DigiVerse <span>·</span> {today}</div>
           </section>
         </div>}
       </main>
-      {notice && <div className="toast" role="status"><Check size={17} /><span>You're all caught up.</span><button aria-label="Dismiss" onClick={() => setNotice(false)}><X size={15} /></button></div>}
+      {notice && <div className="toast" role="status"><span>Notifications will appear here.</span><button aria-label="Dismiss" onClick={() => setNotice(false)}><X size={15} /></button></div>}
     </div>
   )
 }

@@ -1,4 +1,4 @@
--- DigiVerse's own control data. School academic and student records belong in Supabase.
+-- DigiVerse application settings and audit history share the school's D1 database.
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS app_settings (
