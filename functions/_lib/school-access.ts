@@ -9,6 +9,9 @@ export async function getSchoolAccess(request: Request, env: Env, schoolId: stri
     SELECT role FROM school_memberships WHERE user_id = ? AND school_id = ?
   `).bind(session.user.id, schoolId).first<{ role: string }>()
   if (!membership) return { response: Response.json({ error: 'You do not have access to this school.' }, { status: 403 }) }
+  if (request.method !== 'GET' && membership.role !== 'school_admin') {
+    return { response: Response.json({ error: 'Only a school administrator can change school records.' }, { status: 403 }) }
+  }
   return { userId: session.user.id, role: membership.role }
 }
 
