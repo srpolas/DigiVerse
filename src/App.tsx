@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import AppSettings from './AppSettings'
 import Login from './Login'
 import SchoolSetup, { type School } from './SchoolSetup'
-import { ClassesPage, StudentsPage } from './SchoolDataPages'
+import { ClassesPage, StudentsPage, TeachersPage } from './SchoolDataPages'
 import { authClient } from './lib/auth-client'
 import { findMenuItem, menuGroups, type MenuItem } from './navigation'
 import {
@@ -140,7 +140,7 @@ function App() {
           </div>
         </header>
 
-        {active === 'system.settings' ? <AppSettings /> : active === 'classes' ? <ClassesPage schoolId={school.id} onNavigate={setActive} /> : ['students', 'students.search', 'students.transferred', 'students.inactive'].includes(active) ? <StudentsPage key={active} schoolId={school.id} onNavigate={setActive} initialStatus={active === 'students.transferred' ? 'transferred' : active === 'students.inactive' ? 'inactive' : 'active'} /> : active !== 'dashboard' ? <section className="settings-page module-placeholder"><div className="settings-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> {activeItem ? 'SCHOOL WORKSPACE' : 'MODULE'}</div><h1>{activeLabel}</h1><p>{school.name} · {activeItem ? 'This DigiVerse module is ready for its first records.' : 'Choose a menu item to open a workspace.'}</p></div></div><div className="settings-card next-module-card"><span className="platform-setting-icon"><ArrowRight size={19} /></span><div><h2>{activeLabel} workspace</h2><p>Use this area to manage {activeLabel.toLowerCase()} for your school. DigiVerse is building the data workflows for each menu section.</p></div></div></section> : <div className="page-wrap">
+        {active === 'system.settings' ? <AppSettings /> : active === 'classes' ? <ClassesPage schoolId={school.id} onNavigate={setActive} /> : active === 'teachers' ? <TeachersPage schoolId={school.id} onNavigate={setActive} /> : ['students', 'students.search', 'students.transferred', 'students.inactive'].includes(active) ? <StudentsPage key={active} schoolId={school.id} onNavigate={setActive} initialStatus={active === 'students.transferred' ? 'transferred' : active === 'students.inactive' ? 'inactive' : 'active'} /> : active !== 'dashboard' ? <section className="settings-page module-placeholder"><div className="settings-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> {activeItem ? 'SCHOOL WORKSPACE' : 'MODULE'}</div><h1>{activeLabel}</h1><p>{school.name} · {activeItem ? 'This DigiVerse module is ready for its first records.' : 'Choose a menu item to open a workspace.'}</p></div></div><div className="settings-card next-module-card"><span className="platform-setting-icon"><ArrowRight size={19} /></span><div><h2>{activeLabel} workspace</h2><p>Use this area to manage {activeLabel.toLowerCase()} for your school. DigiVerse is building the data workflows for each menu section.</p></div></div></section> : <div className="page-wrap">
           <section className="welcome-row">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SCHOOL WORKSPACE</div>
