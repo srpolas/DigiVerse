@@ -1,0 +1,41 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS staff_members (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  staff_code TEXT NOT NULL,
+  serial_number INTEGER NOT NULL DEFAULT 0,
+  full_name TEXT NOT NULL,
+  full_name_bn TEXT,
+  father_name TEXT,
+  mother_name TEXT,
+  phone TEXT NOT NULL,
+  gender TEXT,
+  birthday TEXT,
+  designation TEXT NOT NULL,
+  joining_date TEXT,
+  email TEXT,
+  previous_institution TEXT,
+  nid_number TEXT,
+  punch_code TEXT,
+  religion TEXT,
+  blood_group TEXT,
+  present_village TEXT,
+  present_post_office TEXT,
+  present_thana TEXT,
+  present_district TEXT,
+  present_holding TEXT,
+  permanent_village TEXT,
+  permanent_post_office TEXT,
+  permanent_thana TEXT,
+  permanent_district TEXT,
+  permanent_holding TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  archived_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (school_id, staff_code),
+  UNIQUE (school_id, email)
+);
+
+CREATE INDEX IF NOT EXISTS staff_members_school_status_serial_idx ON staff_members (school_id, archived_at, status, serial_number);
