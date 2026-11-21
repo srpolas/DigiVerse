@@ -15,7 +15,12 @@ interface SchoolClass {
   status: 'active' | 'inactive'
 }
 
-interface SchoolSection { id: string; class_id: string; class_name?: string; name: string; student_count: number }
+interface SchoolSection {
+  id: string; class_id: string; class_name?: string; name: string; house_code: string | null
+  nickname: string | null; teacher_id: string | null; teacher_name: string | null; shift: string
+  sort_order: number; status: 'active' | 'inactive'; student_count: number
+}
+interface TeacherChoice { id: string; full_name: string; employee_code: string }
 
 interface Student {
   id: string
@@ -150,6 +155,12 @@ export function SectionsPage({ schoolId, onNavigate }: Props) {
   const [sections, setSections] = useState<SchoolSection[]>([])
   const [classId, setClassId] = useState('')
   const [name, setName] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [teacherId, setTeacherId] = useState('')
+  const [shift, setShift] = useState('')
+  const [sortOrder, setSortOrder] = useState('0')
+  const [houseStatus, setHouseStatus] = useState<'active' | 'inactive'>('active')
+  const [teachers, setTeachers] = useState<TeacherChoice[]>([])
   const [editing, setEditing] = useState<SchoolSection | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -158,15 +169,19 @@ export function SectionsPage({ schoolId, onNavigate }: Props) {
   async function load() {
     setLoading(true); setError('')
     try {
-      const [classResponse, sectionResponse] = await Promise.all([
+      const [classResponse, sectionResponse, teacherResponse] = await Promise.all([
         fetch(`/api/school/classes?schoolId=${encodeURIComponent(schoolId)}`),
         fetch(`/api/school/sections?schoolId=${encodeURIComponent(schoolId)}`),
+        fetch(`/api/school/teachers?schoolId=${encodeURIComponent(schoolId)}&status=active`),
       ])
       if (!classResponse.ok) throw new Error(await readError(classResponse))
       if (!sectionResponse.ok) throw new Error(await readError(sectionResponse))
+      if (!teacherResponse.ok && teacherResponse.status !== 403) throw new Error(await readError(teacherResponse))
       const classData = await classResponse.json() as { classes: SchoolClass[] }
       const sectionData = await sectionResponse.json() as { sections: SchoolSection[] }
+      const teacherData = teacherResponse.ok ? await teacherResponse.json() as { teachers: TeacherChoice[] } : { teachers: [] }
       setClasses(classData.classes); setSections(sectionData.sections)
+      setTeachers(teacherData.teachers)
       if (!classId && classData.classes[0]) setClassId(classData.classes[0].id)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sections could not be loaded.') }
     finally { setLoading(false) }
@@ -178,10 +193,10 @@ export function SectionsPage({ schoolId, onNavigate }: Props) {
     try {
       const response = await fetch(`/api/school/sections?schoolId=${encodeURIComponent(schoolId)}`, {
         method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editing?.id, classId, name }),
+        body: JSON.stringify({ id: editing?.id, classId, name, nickname, teacherId, shift, sortOrder: Number(sortOrder) || 0, status: houseStatus }),
       })
       if (!response.ok) throw new Error(await readError(response))
-      setName(''); setEditing(null); await load()
+      setName(''); setNickname(''); setTeacherId(''); setShift(''); setSortOrder('0'); setHouseStatus('active'); setEditing(null); await load()
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Section could not be saved.') }
     finally { setSaving(false) }
   }
@@ -197,12 +212,12 @@ export function SectionsPage({ schoolId, onNavigate }: Props) {
   const shown = sections.filter((section) => section.class_id === classId)
   const selectedClass = classes.find((entry) => entry.id === classId)
   return <section className="settings-page data-page">
-    <div className="settings-heading data-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> ACADEMIC STRUCTURE</div><h1>Houses / sections</h1><p>Divide each class into sections and keep students grouped correctly.</p></div><button className="quiet-button" onClick={() => onNavigate('classes')}>Back to classes</button></div>
+    <div className="settings-heading data-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> ACADEMIC STRUCTURE</div><h1>Houses / sections</h1><p>Assign class houses, in-charge teachers, and shifts.</p></div><button className="quiet-button" onClick={() => onNavigate('classes')}>Back to classes</button></div>
     <div className="section-workspace">
       <aside className="settings-card section-class-list"><div className="section-list-heading"><span>CLASSES</span><strong>{classes.length}</strong></div>{classes.map((entry) => <button className={`section-class-choice ${entry.id === classId ? 'selected' : ''}`} key={entry.id} onClick={() => { setClassId(entry.id); setEditing(null); setName('') }}><span>{entry.name}<small>{entry.student_count} active students</small></span><b>{entry.section_count}</b></button>)}{classes.length === 0 && <p className="section-hint">Create a class before adding sections.</p>}</aside>
       <div className="settings-card data-card"><div className="data-card-header"><div><h2>{selectedClass ? `${selectedClass.name} sections` : 'Sections'}</h2><p>Sections only accept students enrolled in the selected class.</p></div></div>{error && <div className="form-error" role="alert">{error}</div>}
-        <form className="section-create-form" onSubmit={submit}><label>Section name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={60} placeholder="e.g. A, Morning, Blue House" /></label><button className="primary-button" disabled={saving || !classId}>{saving ? 'Saving…' : editing ? 'Save section' : 'Add section'}</button>{editing && <button type="button" className="quiet-button" onClick={() => { setEditing(null); setName('') }}>Cancel</button>}</form>
-        {loading ? <div className="data-empty">Loading sections…</div> : shown.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No sections for this class</strong><p>Add a section above. Students can then be assigned to it from their student record.</p></div> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Section</th><th>Assigned students</th><th>Actions</th></tr></thead><tbody>{shown.map((section) => <tr key={section.id}><td><strong>{section.name}</strong></td><td>{section.student_count}</td><td className="row-actions"><button onClick={() => { setEditing(section); setClassId(section.class_id); setName(section.name) }}>Edit</button><button className="danger-text" disabled={section.student_count > 0} title={section.student_count ? 'Move students out of this section before deleting' : 'Delete section'} onClick={() => void remove(section)}>Delete</button></td></tr>)}</tbody></table></div>}
+        <form className="house-form" onSubmit={submit}><div className="house-form-title"><div><strong>{editing ? `Edit ${editing.name}` : 'Add a house'}</strong><small>House code is generated automatically.</small></div>{editing && <button type="button" className="quiet-button" onClick={() => { setEditing(null); setName(''); setNickname(''); setTeacherId(''); setShift(''); setSortOrder('0'); setHouseStatus('active') }}>Cancel</button>}</div><div className="house-form-fields"><label>House name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={60} placeholder="e.g. Shondip A" /></label><label>Nickname <span className="optional-label">Optional</span><input value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={60} placeholder="Short name" /></label><label>In-charge teacher<select value={teacherId} onChange={(event) => setTeacherId(event.target.value)}><option value="">No teacher assigned</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.full_name} · {teacher.employee_code}</option>)}</select></label><label>Shift<select value={shift} onChange={(event) => setShift(event.target.value)}><option value="">Not set</option><option value="Morning">Morning</option><option value="Day">Day</option><option value="Evening">Evening</option></select></label><label>Numerical order<input type="number" min="0" max="999" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} /></label><label>Status<select value={houseStatus} onChange={(event) => setHouseStatus(event.target.value as 'active' | 'inactive')}><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div><div className="house-form-footer"><small>House will be created under <strong>{selectedClass?.name || 'the selected class'}</strong></small><button className="primary-button" disabled={saving || !classId}>{saving ? 'Saving…' : editing ? 'Save house' : 'Add house'}</button></div></form>
+        {loading ? <div className="data-empty">Loading houses…</div> : shown.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No houses for this class</strong><p>Add a house above. Students can then be assigned to it from their student record.</p></div> : <div className="table-scroll"><table className="data-table house-table"><thead><tr><th>Code</th><th>House</th><th>Numerical no.</th><th>In-charge teacher</th><th>Shift</th><th>Students</th><th>Status</th><th>Actions</th></tr></thead><tbody>{shown.map((section) => <tr key={section.id}><td><strong>{section.house_code || '—'}</strong></td><td><strong>{section.name}</strong>{section.nickname && <small className="cell-subtitle">{section.nickname}</small>}</td><td>{section.sort_order}</td><td>{section.teacher_name || '—'}</td><td>{section.shift || '—'}</td><td>{section.student_count}</td><td><span className={`student-status ${section.status === 'inactive' ? 'status-inactive' : ''}`}>{section.status}</span></td><td className="row-actions"><button onClick={() => { setEditing(section); setClassId(section.class_id); setName(section.name); setNickname(section.nickname || ''); setTeacherId(section.teacher_id || ''); setShift(section.shift || ''); setSortOrder(String(section.sort_order)); setHouseStatus(section.status || 'active') }}>Edit</button><button className="danger-text" disabled={section.student_count > 0} title={section.student_count ? 'Move students out of this house before deleting' : 'Delete house'} onClick={() => void remove(section)}>Delete</button></td></tr>)}</tbody></table></div>}
       </div>
     </div>
   </section>
