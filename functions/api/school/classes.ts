@@ -6,7 +6,13 @@ interface SchoolClass {
   school_id: string
   name: string
   sort_order: number
+  class_type: string
+  auto_attendance: number
+  id_card_file: string | null
+  status: string
   student_count: number
+  total_student_count: number
+  section_count: number
   created_at: string
 }
 
@@ -21,44 +27,57 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const allowed = await access(request, env)
   if (allowed.response) return allowed.response
   const { results = [] } = await env.CONTROL_DB.prepare(`
-    SELECT classes.id, classes.school_id, classes.name, classes.sort_order, classes.created_at,
-      (SELECT COUNT(*) FROM students WHERE students.class_id = classes.id AND students.status = 'active') AS student_count
+    SELECT classes.id, classes.school_id, classes.name, classes.sort_order, classes.class_type,
+      classes.auto_attendance, classes.id_card_file, classes.status, classes.created_at,
+      (SELECT COUNT(*) FROM students WHERE students.class_id = classes.id AND students.status = 'active') AS student_count,
+      (SELECT COUNT(*) FROM students WHERE students.class_id = classes.id) AS total_student_count,
+      (SELECT COUNT(*) FROM sections WHERE sections.class_id = classes.id) AS section_count
     FROM classes WHERE classes.school_id = ? ORDER BY classes.sort_order, classes.name
   `).bind(allowed.schoolId).all<SchoolClass>()
   return apiJson({ classes: results })
 }
 
+function classSettings(body: Record<string, unknown>) {
+  const classType = ['standard', 'individual', 'common'].includes(String(body.classType)) ? String(body.classType) : 'standard'
+  const autoAttendance = body.autoAttendance === true ? 1 : 0
+  const idCardFile = typeof body.idCardFile === 'string' ? body.idCardFile.trim().slice(0, 500) : ''
+  const status = body.status === 'inactive' ? 'inactive' : 'active'
+  return { classType, autoAttendance, idCardFile: idCardFile || null, status }
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const allowed = await access(request, env)
   if (allowed.response) return allowed.response
-  let body: { name?: unknown; sortOrder?: unknown }
+  let body: Record<string, unknown>
   try { body = await request.json() as typeof body } catch { return apiJson({ error: 'Enter a class name.' }, 400) }
   const name = typeof body.name === 'string' ? body.name.trim() : ''
-  const sortOrder = Number.isInteger(body.sortOrder) ? Number(body.sortOrder) : 0
+  const sortOrder = Number.isInteger(body.sortOrder) && Number(body.sortOrder) >= 0 ? Number(body.sortOrder) : 0
   if (name.length < 1 || name.length > 60) return apiJson({ error: 'Class name must be 1–60 characters.' }, 400)
+  const settings = classSettings(body)
   const id = crypto.randomUUID()
   try {
-    await env.CONTROL_DB.prepare('INSERT INTO classes (id, school_id, name, sort_order) VALUES (?, ?, ?, ?)')
-      .bind(id, allowed.schoolId, name, sortOrder).run()
+    await env.CONTROL_DB.prepare('INSERT INTO classes (id, school_id, name, sort_order, class_type, auto_attendance, id_card_file, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, allowed.schoolId, name, sortOrder, settings.classType, settings.autoAttendance, settings.idCardFile, settings.status).run()
   } catch (error) {
     if (String(error).toLowerCase().includes('unique')) return apiJson({ error: 'A class with that name already exists.' }, 409)
     throw error
   }
-  return apiJson({ class: { id, school_id: allowed.schoolId, name, sort_order: sortOrder, student_count: 0 } }, 201)
+  return apiJson({ class: { id, school_id: allowed.schoolId, name, sort_order: sortOrder, ...settings, student_count: 0, section_count: 0 } }, 201)
 }
 
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env }) => {
   const allowed = await access(request, env)
   if (allowed.response) return allowed.response
-  let body: { id?: unknown; name?: unknown; sortOrder?: unknown }
+  let body: Record<string, unknown>
   try { body = await request.json() as typeof body } catch { return apiJson({ error: 'Enter class details.' }, 400) }
   const id = typeof body.id === 'string' ? body.id : ''
   const name = typeof body.name === 'string' ? body.name.trim() : ''
-  const sortOrder = Number.isInteger(body.sortOrder) ? Number(body.sortOrder) : 0
+  const sortOrder = Number.isInteger(body.sortOrder) && Number(body.sortOrder) >= 0 ? Number(body.sortOrder) : 0
+  const settings = classSettings(body)
   if (!id || name.length < 1 || name.length > 60) return apiJson({ error: 'Class name must be 1–60 characters.' }, 400)
   try {
-    const result = await env.CONTROL_DB.prepare('UPDATE classes SET name = ?, sort_order = ? WHERE id = ? AND school_id = ?')
-      .bind(name, sortOrder, id, allowed.schoolId).run()
+    const result = await env.CONTROL_DB.prepare('UPDATE classes SET name = ?, sort_order = ?, class_type = ?, auto_attendance = ?, id_card_file = ?, status = ? WHERE id = ? AND school_id = ?')
+      .bind(name, sortOrder, settings.classType, settings.autoAttendance, settings.idCardFile, settings.status, id, allowed.schoolId).run()
     if (!result.meta.changes) return apiJson({ error: 'Class not found.' }, 404)
   } catch (error) {
     if (String(error).toLowerCase().includes('unique')) return apiJson({ error: 'A class with that name already exists.' }, 409)

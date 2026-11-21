@@ -7,7 +7,15 @@ interface SchoolClass {
   name: string
   sort_order: number
   student_count: number
+  total_student_count: number
+  section_count: number
+  class_type: 'standard' | 'individual' | 'common'
+  auto_attendance: number
+  id_card_file: string | null
+  status: 'active' | 'inactive'
 }
+
+interface SchoolSection { id: string; class_id: string; class_name?: string; name: string; student_count: number }
 
 interface Student {
   id: string
@@ -44,6 +52,11 @@ export function ClassesPage({ schoolId, onNavigate }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [classType, setClassType] = useState<SchoolClass['class_type']>('standard')
+  const [autoAttendance, setAutoAttendance] = useState(false)
+  const [idCardFile, setIdCardFile] = useState('')
+  const [classStatus, setClassStatus] = useState<SchoolClass['status']>('active')
 
   async function loadClasses() {
     setLoading(true)
@@ -60,10 +73,18 @@ export function ClassesPage({ schoolId, onNavigate }: Props) {
 
   useEffect(() => { void loadClasses() }, [schoolId])
 
+  const filteredClasses = classes.filter((row) => row.name.toLowerCase().includes(search.trim().toLowerCase()))
+  const totalStudents = classes.reduce((total, row) => total + row.student_count, 0)
+  const totalSections = classes.reduce((total, row) => total + row.section_count, 0)
+
   function startEdit(row: SchoolClass) {
     setEditing(row)
     setName(row.name)
     setSortOrder(String(row.sort_order))
+    setClassType(row.class_type || 'standard')
+    setAutoAttendance(Boolean(row.auto_attendance))
+    setIdCardFile(row.id_card_file || '')
+    setClassStatus(row.status || 'active')
     setError('')
   }
 
@@ -71,6 +92,10 @@ export function ClassesPage({ schoolId, onNavigate }: Props) {
     setEditing(null)
     setName('')
     setSortOrder('0')
+    setClassType('standard')
+    setAutoAttendance(false)
+    setIdCardFile('')
+    setClassStatus('active')
     setError('')
   }
 
@@ -82,7 +107,7 @@ export function ClassesPage({ schoolId, onNavigate }: Props) {
       const response = await fetch(`/api/school/classes?schoolId=${encodeURIComponent(schoolId)}`, {
         method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editing?.id, name, sortOrder: Number(sortOrder) || 0 }),
+        body: JSON.stringify({ id: editing?.id, name, sortOrder: Number(sortOrder) || 0, classType, autoAttendance, idCardFile, status: classStatus }),
       })
       if (!response.ok) throw new Error(await readError(response))
       clearForm()
@@ -106,26 +131,89 @@ export function ClassesPage({ schoolId, onNavigate }: Props) {
 
   return <section className="settings-page data-page">
     <div className="settings-heading data-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> ACADEMIC STRUCTURE</div><h1>Classes</h1><p>Set up grade levels before enrolling students.</p></div><button className="primary-button compact-action" onClick={() => { clearForm(); document.getElementById('class-name')?.focus() }}><Plus size={15} /> Add class</button></div>
+    <div className="class-overview-grid"><article className="class-overview-card"><span>Classes</span><strong>{classes.length}</strong><small>Grade levels configured</small></article><article className="class-overview-card"><span>Active students</span><strong>{totalStudents}</strong><small>Across all classes</small></article><article className="class-overview-card"><span>Sections</span><strong>{totalSections}</strong><small>Groups within classes</small></article></div>
     <div className="settings-card data-card">
-      <div className="data-card-header"><div><h2>Class list</h2><p>{classes.length} {classes.length === 1 ? 'class' : 'classes'} configured</p></div><button className="text-action" onClick={() => onNavigate('sections')}>Manage houses / sections <ArrowLeft size={13} className="flip-icon" /></button></div>
+      <div className="data-card-header"><div><h2>Class list</h2><p>{filteredClasses.length} of {classes.length} {classes.length === 1 ? 'class' : 'classes'} shown</p></div><div className="class-list-tools"><label className="student-search"><Search size={15} /><input aria-label="Search classes" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search classes…" /></label><button className="text-action" onClick={() => onNavigate('sections')}>Manage houses / sections <ArrowLeft size={13} className="flip-icon" /></button></div></div>
       {error && <div className="form-error" role="alert">{error}</div>}
-      <form className="inline-data-form" onSubmit={submit}>
-        <label htmlFor="class-name">{editing ? 'Edit class' : 'New class'}</label>
-        <input id="class-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Class One" required maxLength={60} />
-        <label className="order-label" htmlFor="class-order">Order</label><input id="class-order" type="number" min="0" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} />
-        <button className="primary-button" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save class' : 'Add class'}</button>
-        {editing && <button type="button" className="quiet-button" onClick={clearForm}>Cancel</button>}
+      <form className="class-settings-form" onSubmit={submit}>
+        <div className="class-settings-heading"><div><strong>{editing ? `Edit ${editing.name}` : 'Add a class'}</strong><small>Set its name, category, and display order.</small></div>{editing && <button type="button" className="quiet-button" onClick={clearForm}>Cancel</button>}</div>
+        <div className="class-settings-fields"><label>Class name<input id="class-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Class One or HSC 2026–2027" required maxLength={60} /></label><label>Class type<select value={classType} onChange={(event) => setClassType(event.target.value as SchoolClass['class_type'])}><option value="standard">Standard</option><option value="individual">Individual</option><option value="common">Common</option></select></label><label>Numerical order<input type="number" min="0" max="999" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} /></label><label>Status<select value={classStatus} onChange={(event) => setClassStatus(event.target.value as SchoolClass['status'])}><option value="active">Active</option><option value="inactive">Inactive</option></select></label><label className="class-card-file">ID card file or template path <span className="optional-label">Optional</span><input value={idCardFile} onChange={(event) => setIdCardFile(event.target.value)} placeholder="R2 object key or template path" maxLength={500} /></label></div>
+        <div className="class-settings-footer"><label className="class-toggle"><input type="checkbox" checked={autoAttendance} onChange={(event) => setAutoAttendance(event.target.checked)} /><span><strong>Auto attendance</strong><small>Allow this class to be included in automated attendance workflows.</small></span></label><button className="primary-button" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save class settings' : 'Create class'}</button></div>
       </form>
-      {loading ? <div className="data-empty">Loading classes…</div> : classes.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No classes yet</strong><p>Create grade levels such as Class One, Class Two, or HSC 2026–2027.</p></div> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Class name</th><th>Students</th><th>Order</th><th>Actions</th></tr></thead><tbody>{classes.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.student_count}</td><td>{row.sort_order}</td><td className="row-actions"><button onClick={() => startEdit(row)}>Edit</button><button className="danger-text" onClick={() => void remove(row)} disabled={row.student_count > 0}>Delete</button></td></tr>)}</tbody></table></div>}
+      {loading ? <div className="data-empty">Loading classes…</div> : classes.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No classes yet</strong><p>Create grade levels such as Class One, Class Two, or HSC 2026–2027.</p></div> : filteredClasses.length === 0 ? <div className="data-empty"><strong>No matching classes</strong><p>Try a different class name.</p></div> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Class</th><th>Type</th><th>Active students</th><th>Sections</th><th>Attendance</th><th>Status</th><th>Order</th><th>Actions</th></tr></thead><tbody>{filteredClasses.map((row) => <tr key={row.id}><td><strong>{row.name}</strong>{row.id_card_file && <small className="cell-subtitle">ID card template set</small>}</td><td className="capitalize-cell">{row.class_type || 'standard'}</td><td>{row.student_count}</td><td>{row.section_count}</td><td>{row.auto_attendance ? 'Auto' : 'Manual'}</td><td><span className={`student-status ${row.status === 'inactive' ? 'status-inactive' : ''}`}>{row.status}</span></td><td>{row.sort_order}</td><td className="row-actions"><button onClick={() => startEdit(row)}>Edit</button><button className="danger-text" title={row.total_student_count > 0 ? 'This class has student records; transfer them before deleting' : 'Delete class'} onClick={() => void remove(row)} disabled={row.total_student_count > 0}>Delete</button></td></tr>)}</tbody></table></div>}
     </div>
   </section>
 }
 
-const emptyStudent = { fullName: '', studentCode: '', rollNumber: '', classId: '', fullNameBn: '', dateOfBirth: '', guardianName: '', guardianPhone: '' }
+export function SectionsPage({ schoolId, onNavigate }: Props) {
+  const [classes, setClasses] = useState<SchoolClass[]>([])
+  const [sections, setSections] = useState<SchoolSection[]>([])
+  const [classId, setClassId] = useState('')
+  const [name, setName] = useState('')
+  const [editing, setEditing] = useState<SchoolSection | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function load() {
+    setLoading(true); setError('')
+    try {
+      const [classResponse, sectionResponse] = await Promise.all([
+        fetch(`/api/school/classes?schoolId=${encodeURIComponent(schoolId)}`),
+        fetch(`/api/school/sections?schoolId=${encodeURIComponent(schoolId)}`),
+      ])
+      if (!classResponse.ok) throw new Error(await readError(classResponse))
+      if (!sectionResponse.ok) throw new Error(await readError(sectionResponse))
+      const classData = await classResponse.json() as { classes: SchoolClass[] }
+      const sectionData = await sectionResponse.json() as { sections: SchoolSection[] }
+      setClasses(classData.classes); setSections(sectionData.sections)
+      if (!classId && classData.classes[0]) setClassId(classData.classes[0].id)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sections could not be loaded.') }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { void load() }, [schoolId])
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSaving(true); setError('')
+    try {
+      const response = await fetch(`/api/school/sections?schoolId=${encodeURIComponent(schoolId)}`, {
+        method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editing?.id, classId, name }),
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      setName(''); setEditing(null); await load()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Section could not be saved.') }
+    finally { setSaving(false) }
+  }
+  async function remove(section: SchoolSection) {
+    if (!window.confirm(`Delete ${section.name} from ${section.class_name}?`)) return
+    setError('')
+    try {
+      const response = await fetch(`/api/school/sections?schoolId=${encodeURIComponent(schoolId)}&id=${encodeURIComponent(section.id)}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error(await readError(response))
+      await load()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Section could not be deleted.') }
+  }
+  const shown = sections.filter((section) => section.class_id === classId)
+  const selectedClass = classes.find((entry) => entry.id === classId)
+  return <section className="settings-page data-page">
+    <div className="settings-heading data-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> ACADEMIC STRUCTURE</div><h1>Houses / sections</h1><p>Divide each class into sections and keep students grouped correctly.</p></div><button className="quiet-button" onClick={() => onNavigate('classes')}>Back to classes</button></div>
+    <div className="section-workspace">
+      <aside className="settings-card section-class-list"><div className="section-list-heading"><span>CLASSES</span><strong>{classes.length}</strong></div>{classes.map((entry) => <button className={`section-class-choice ${entry.id === classId ? 'selected' : ''}`} key={entry.id} onClick={() => { setClassId(entry.id); setEditing(null); setName('') }}><span>{entry.name}<small>{entry.student_count} active students</small></span><b>{entry.section_count}</b></button>)}{classes.length === 0 && <p className="section-hint">Create a class before adding sections.</p>}</aside>
+      <div className="settings-card data-card"><div className="data-card-header"><div><h2>{selectedClass ? `${selectedClass.name} sections` : 'Sections'}</h2><p>Sections only accept students enrolled in the selected class.</p></div></div>{error && <div className="form-error" role="alert">{error}</div>}
+        <form className="section-create-form" onSubmit={submit}><label>Section name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={60} placeholder="e.g. A, Morning, Blue House" /></label><button className="primary-button" disabled={saving || !classId}>{saving ? 'Saving…' : editing ? 'Save section' : 'Add section'}</button>{editing && <button type="button" className="quiet-button" onClick={() => { setEditing(null); setName('') }}>Cancel</button>}</form>
+        {loading ? <div className="data-empty">Loading sections…</div> : shown.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No sections for this class</strong><p>Add a section above. Students can then be assigned to it from their student record.</p></div> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Section</th><th>Assigned students</th><th>Actions</th></tr></thead><tbody>{shown.map((section) => <tr key={section.id}><td><strong>{section.name}</strong></td><td>{section.student_count}</td><td className="row-actions"><button onClick={() => { setEditing(section); setClassId(section.class_id); setName(section.name) }}>Edit</button><button className="danger-text" disabled={section.student_count > 0} title={section.student_count ? 'Move students out of this section before deleting' : 'Delete section'} onClick={() => void remove(section)}>Delete</button></td></tr>)}</tbody></table></div>}
+      </div>
+    </div>
+  </section>
+}
+
+const emptyStudent = { fullName: '', studentCode: '', rollNumber: '', classId: '', sectionId: '', fullNameBn: '', dateOfBirth: '', guardianName: '', guardianPhone: '' }
 
 export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }: Props) {
   const [students, setStudents] = useState<Student[]>([])
   const [classes, setClasses] = useState<SchoolClass[]>([])
+  const [sections, setSections] = useState<SchoolSection[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState(initialStatus)
   const [form, setForm] = useState(emptyStudent)
@@ -147,7 +235,11 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
       if (!studentResponse.ok) throw new Error(await readError(studentResponse))
       const classData = await classResponse.json() as { classes: SchoolClass[] }
       const studentData = await studentResponse.json() as { students: Student[] }
+      const sectionResponse = await fetch(`/api/school/sections?schoolId=${encodeURIComponent(schoolId)}`)
+      if (!sectionResponse.ok) throw new Error(await readError(sectionResponse))
+      const sectionData = await sectionResponse.json() as { sections: SchoolSection[] }
       setClasses(classData.classes)
+      setSections(sectionData.sections)
       setStudents(studentData.students)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Student records could not be loaded.')
@@ -158,7 +250,7 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
 
   function editStudent(student: Student) {
     setEditing(student)
-    setForm({ fullName: student.full_name, studentCode: student.student_code, rollNumber: student.roll_number, classId: student.class_id, fullNameBn: student.full_name_bn || '', dateOfBirth: student.date_of_birth || '', guardianName: student.guardian_name || '', guardianPhone: student.guardian_phone || '' })
+    setForm({ fullName: student.full_name, studentCode: student.student_code, rollNumber: student.roll_number, classId: student.class_id, sectionId: student.section_id || '', fullNameBn: student.full_name_bn || '', dateOfBirth: student.date_of_birth || '', guardianName: student.guardian_name || '', guardianPhone: student.guardian_phone || '' })
     setFormOpen(true)
   }
 
@@ -177,7 +269,7 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
       ...form,
       id: editing?.id,
       status: editing?.status || 'active',
-      sectionId: editing?.section_id || '',
+      sectionId: form.sectionId,
     }
     try {
       const response = await fetch(`/api/school/students?schoolId=${encodeURIComponent(schoolId)}`, {
@@ -216,7 +308,8 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
         <label>Full name<input required maxLength={120} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
         <label>Student ID<input required maxLength={40} value={form.studentCode} onChange={(e) => setForm({ ...form, studentCode: e.target.value })} /></label>
         <label>Roll number<input required maxLength={30} value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} /></label>
-        <label>Class<select required value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })}><option value="">Choose a class</option>{classes.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>
+        <label>Class<select required value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value, sectionId: '' })}><option value="">Choose a class</option>{classes.filter((entry) => entry.status !== 'inactive' || entry.id === editing?.class_id).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}{entry.status === 'inactive' ? ' (inactive)' : ''}</option>)}</select></label>
+        <label>Section <span className="optional-label">Optional</span><select value={form.sectionId} disabled={!form.classId} onChange={(e) => setForm({ ...form, sectionId: e.target.value })}><option value="">No section</option>{sections.filter((section) => section.class_id === form.classId).map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}</select></label>
         <label>Bangla name <span className="optional-label">Optional</span><input maxLength={120} value={form.fullNameBn} onChange={(e) => setForm({ ...form, fullNameBn: e.target.value })} /></label>
         <label>Date of birth <span className="optional-label">Optional</span><input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} /></label>
         <label>Guardian name <span className="optional-label">Optional</span><input maxLength={120} value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} /></label>
