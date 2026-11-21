@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowLeft, Mail, Phone, Plus, Search, Users, X } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Mail, Phone, Plus, Search, Users, X } from 'lucide-react'
 
 interface SchoolClass {
   id: string
@@ -33,6 +33,13 @@ interface Student {
   date_of_birth: string | null
   guardian_name: string | null
   guardian_phone: string | null
+  gender: string | null; father_name: string | null; father_phone: string | null
+  mother_name: string | null; mother_phone: string | null; student_phone: string | null
+  email: string | null; nickname: string | null; blood_group: string | null; religion: string | null
+  group_name: string; birth_certificate_number: string | null; previous_institute_name: string | null; session: string | null
+  present_village: string | null; present_district: string | null; present_thana: string | null
+  present_post_office: string | null; present_holding: string | null; permanent_village: string | null
+  permanent_district: string | null; permanent_thana: string | null; permanent_post_office: string | null; permanent_holding: string | null
   status: 'active' | 'inactive' | 'transferred'
   class_name: string
   section_name: string | null
@@ -223,7 +230,30 @@ export function SectionsPage({ schoolId, onNavigate }: Props) {
   </section>
 }
 
-const emptyStudent = { fullName: '', studentCode: '', rollNumber: '', classId: '', sectionId: '', fullNameBn: '', dateOfBirth: '', guardianName: '', guardianPhone: '' }
+const emptyStudent = {
+  fullName: '', studentCode: '', rollNumber: '', classId: '', sectionId: '', fullNameBn: '', dateOfBirth: '',
+  guardianName: '', guardianPhone: '', gender: '', fatherName: '', fatherPhone: '', motherName: '', motherPhone: '',
+  studentPhone: '', email: '', nickname: '', bloodGroup: '', religion: '', groupName: 'Common',
+  birthCertificateNumber: '', previousInstituteName: '', session: '', presentVillage: '', presentDistrict: '',
+  presentThana: '', presentPostOffice: '', presentHolding: '', permanentVillage: '', permanentDistrict: '',
+  permanentThana: '', permanentPostOffice: '', permanentHolding: '',
+}
+
+function studentBody(student: Student, status: Student['status']) {
+  return {
+    id: student.id, fullName: student.full_name, studentCode: student.student_code, rollNumber: student.roll_number,
+    classId: student.class_id, sectionId: student.section_id || '', fullNameBn: student.full_name_bn || '',
+    dateOfBirth: student.date_of_birth || '', guardianName: student.guardian_name || '', guardianPhone: student.guardian_phone || '', status,
+    gender: student.gender || '', fatherName: student.father_name || '', fatherPhone: student.father_phone || '',
+    motherName: student.mother_name || '', motherPhone: student.mother_phone || '', studentPhone: student.student_phone || '',
+    email: student.email || '', nickname: student.nickname || '', bloodGroup: student.blood_group || '', religion: student.religion || '',
+    groupName: student.group_name || 'Common', birthCertificateNumber: student.birth_certificate_number || '',
+    previousInstituteName: student.previous_institute_name || '', session: student.session || '', presentVillage: student.present_village || '',
+    presentDistrict: student.present_district || '', presentThana: student.present_thana || '', presentPostOffice: student.present_post_office || '',
+    presentHolding: student.present_holding || '', permanentVillage: student.permanent_village || '', permanentDistrict: student.permanent_district || '',
+    permanentThana: student.permanent_thana || '', permanentPostOffice: student.permanent_post_office || '', permanentHolding: student.permanent_holding || '',
+  }
+}
 
 export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }: Props) {
   const [students, setStudents] = useState<Student[]>([])
@@ -231,6 +261,11 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
   const [sections, setSections] = useState<SchoolSection[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState(initialStatus)
+  const [classFilter, setClassFilter] = useState('')
+  const [sectionFilter, setSectionFilter] = useState('')
+  const [groupFilter, setGroupFilter] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [viewing, setViewing] = useState<Student | null>(null)
   const [form, setForm] = useState(emptyStudent)
   const [editing, setEditing] = useState<Student | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -244,7 +279,7 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
     try {
       const [classResponse, studentResponse] = await Promise.all([
         fetch(`/api/school/classes?schoolId=${encodeURIComponent(schoolId)}`),
-        fetch(`/api/school/students?schoolId=${encodeURIComponent(schoolId)}&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`),
+        fetch(`/api/school/students?schoolId=${encodeURIComponent(schoolId)}&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&classId=${encodeURIComponent(classFilter)}&sectionId=${encodeURIComponent(sectionFilter)}&groupName=${encodeURIComponent(groupFilter)}`),
       ])
       if (!classResponse.ok) throw new Error(await readError(classResponse))
       if (!studentResponse.ok) throw new Error(await readError(studentResponse))
@@ -256,16 +291,29 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
       setClasses(classData.classes)
       setSections(sectionData.sections)
       setStudents(studentData.students)
+      setSelectedIds([])
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Student records could not be loaded.')
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { void loadData() }, [schoolId, search, status])
+  useEffect(() => { void loadData() }, [schoolId, search, status, classFilter, sectionFilter, groupFilter])
 
   function editStudent(student: Student) {
     setEditing(student)
-    setForm({ fullName: student.full_name, studentCode: student.student_code, rollNumber: student.roll_number, classId: student.class_id, sectionId: student.section_id || '', fullNameBn: student.full_name_bn || '', dateOfBirth: student.date_of_birth || '', guardianName: student.guardian_name || '', guardianPhone: student.guardian_phone || '' })
+    setForm({
+      ...emptyStudent, fullName: student.full_name, studentCode: student.student_code, rollNumber: student.roll_number,
+      classId: student.class_id, sectionId: student.section_id || '', fullNameBn: student.full_name_bn || '',
+      dateOfBirth: student.date_of_birth || '', guardianName: student.guardian_name || '', guardianPhone: student.guardian_phone || '',
+      gender: student.gender || '', fatherName: student.father_name || '', fatherPhone: student.father_phone || '',
+      motherName: student.mother_name || '', motherPhone: student.mother_phone || '', studentPhone: student.student_phone || '',
+      email: student.email || '', nickname: student.nickname || '', bloodGroup: student.blood_group || '', religion: student.religion || '',
+      groupName: student.group_name || 'Common', birthCertificateNumber: student.birth_certificate_number || '',
+      previousInstituteName: student.previous_institute_name || '', session: student.session || '', presentVillage: student.present_village || '',
+      presentDistrict: student.present_district || '', presentThana: student.present_thana || '', presentPostOffice: student.present_post_office || '',
+      presentHolding: student.present_holding || '', permanentVillage: student.permanent_village || '', permanentDistrict: student.permanent_district || '',
+      permanentThana: student.permanent_thana || '', permanentPostOffice: student.permanent_post_office || '', permanentHolding: student.permanent_holding || '',
+    })
     setFormOpen(true)
   }
 
@@ -305,7 +353,7 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
     try {
       const response = await fetch(`/api/school/students?schoolId=${encodeURIComponent(schoolId)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: student.id, fullName: student.full_name, studentCode: student.student_code, rollNumber: student.roll_number, classId: student.class_id, sectionId: student.section_id || '', fullNameBn: student.full_name_bn || '', dateOfBirth: student.date_of_birth || '', guardianName: student.guardian_name || '', guardianPhone: student.guardian_phone || '', status: nextStatus }),
+        body: JSON.stringify(studentBody(student, nextStatus)),
       })
       if (!response.ok) throw new Error(await readError(response))
       await loadData()
@@ -314,23 +362,55 @@ export function StudentsPage({ schoolId, onNavigate, initialStatus = 'active' }:
     }
   }
 
+  async function bulkStatus(nextStatus: 'active' | 'inactive') {
+    if (!selectedIds.length) return
+    setError('')
+    try {
+      const response = await fetch(`/api/school/students?schoolId=${encodeURIComponent(schoolId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds, status: nextStatus }),
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      await loadData()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Student status could not be updated.') }
+  }
+
+  function exportStudents() {
+    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const rows = [['Student ID', 'Roll', 'Name', 'Name (Bangla)', 'Class', 'House / Section', 'Group', 'Guardian', 'Guardian phone', 'Student phone', 'Status'],
+      ...students.map((student) => [student.student_code, student.roll_number, student.full_name, student.full_name_bn, student.class_name, student.section_name, student.group_name, student.guardian_name, student.guardian_phone, student.student_phone, student.status])]
+    const csv = rows.map((row) => row.map(quote).join(',')).join('\r\n')
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }))
+    link.download = 'digiverse-students.csv'; link.click(); URL.revokeObjectURL(link.href)
+  }
+
   return <section className="settings-page data-page">
-    <div className="settings-heading data-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> STUDENT INFORMATION</div><h1>Students</h1><p>Manage student records for your school. DigiVerse supports up to 500 active students.</p></div><button className="primary-button compact-action" onClick={() => { setForm(emptyStudent); setEditing(null); setFormOpen(!formOpen); setError('') }}><Plus size={15} /> Add student</button></div>
+    <div className="settings-heading data-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> STUDENT INFORMATION</div><h1>Students</h1><p>Enrollment, family contacts, and class placement · up to 500 active students.</p></div><div className="student-heading-actions"><button className="quiet-button export-button" onClick={exportStudents} disabled={!students.length}><Download size={14} /> Export CSV</button><button className="primary-button compact-action" onClick={() => { setForm(emptyStudent); setEditing(null); setFormOpen(!formOpen); setError('') }}><Plus size={15} /> Add student</button></div></div>
     <div className="settings-card data-card">
-      <div className="data-card-header"><div><h2>Student directory</h2><p>{students.length} records shown</p></div><div className="data-filters"><label className="student-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, ID, roll…" /></label><select aria-label="Filter by student status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active students</option><option value="inactive">Inactive</option><option value="transferred">Transferred</option><option value="all">All students</option></select></div></div>
+      <div className="data-card-header student-directory-header"><div><h2>Student directory</h2><p>{students.length} records match your filters</p></div><div className="student-filters"><label className="student-search"><Search size={15} /><input aria-label="Search students" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, ID, roll, guardian…" /></label><select aria-label="Filter by class" value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setSectionFilter('') }}><option value="">All classes</option>{classes.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select><select aria-label="Filter by house or section" value={sectionFilter} onChange={(event) => setSectionFilter(event.target.value)}><option value="">All houses / sections</option>{sections.filter((section) => !classFilter || section.class_id === classFilter).map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}</select><select aria-label="Filter by group" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">All groups</option><option>Common</option><option>Science</option><option>Humanities</option><option>Business Studies</option></select><select aria-label="Filter by student status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option><option value="transferred">Transferred</option><option value="all">All statuses</option></select></div></div>
+      {selectedIds.length > 0 && <div className="student-bulk-bar"><strong>{selectedIds.length} selected</strong><span /><button onClick={() => void bulkStatus('active')}>Set active</button><button onClick={() => void bulkStatus('inactive')}>Set inactive</button><button className="quiet-button" onClick={() => setSelectedIds([])}>Clear selection</button></div>}
       {error && <div className="form-error" role="alert">{error}</div>}
-      {formOpen && <form className="student-form" onSubmit={submit}><div className="student-form-heading"><strong>{editing ? 'Edit student record' : 'Add a student'}</strong><button type="button" aria-label="Close form" className="icon-button" onClick={closeForm}><X size={16} /></button></div><div className="student-form-grid">
-        <label>Full name<input required maxLength={120} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
-        <label>Student ID<input required maxLength={40} value={form.studentCode} onChange={(e) => setForm({ ...form, studentCode: e.target.value })} /></label>
-        <label>Roll number<input required maxLength={30} value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} /></label>
-        <label>Class<select required value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value, sectionId: '' })}><option value="">Choose a class</option>{classes.filter((entry) => entry.status !== 'inactive' || entry.id === editing?.class_id).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}{entry.status === 'inactive' ? ' (inactive)' : ''}</option>)}</select></label>
-        <label>Section <span className="optional-label">Optional</span><select value={form.sectionId} disabled={!form.classId} onChange={(e) => setForm({ ...form, sectionId: e.target.value })}><option value="">No section</option>{sections.filter((section) => section.class_id === form.classId).map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}</select></label>
-        <label>Bangla name <span className="optional-label">Optional</span><input maxLength={120} value={form.fullNameBn} onChange={(e) => setForm({ ...form, fullNameBn: e.target.value })} /></label>
-        <label>Date of birth <span className="optional-label">Optional</span><input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} /></label>
-        <label>Guardian name <span className="optional-label">Optional</span><input maxLength={120} value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} /></label>
-        <label>Guardian phone <span className="optional-label">Optional</span><input type="tel" maxLength={32} value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} /></label>
-      </div><div className="student-form-actions"><button className="primary-button" disabled={saving || classes.length === 0}>{saving ? 'Saving…' : editing ? 'Save student' : 'Create student'}</button><button type="button" className="quiet-button" onClick={closeForm}>Cancel</button>{classes.length === 0 && <button type="button" className="text-action" onClick={() => onNavigate('classes')}>Create a class first</button>}</div></form>}
-      {loading ? <div className="data-empty">Loading student records…</div> : students.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No students found</strong><p>{search ? 'Try another search.' : classes.length ? 'Add a student to begin your directory.' : 'Create at least one class before enrolling students.'}</p>{!classes.length && <button className="text-action" onClick={() => onNavigate('classes')}>Go to classes</button>}</div> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Student</th><th>Student ID</th><th>Class / roll</th><th>Guardian</th><th>Status</th><th>Actions</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td><strong>{student.full_name}</strong>{student.full_name_bn && <small className="cell-subtitle">{student.full_name_bn}</small>}</td><td>{student.student_code}</td><td>{student.class_name}<small className="cell-subtitle">Roll {student.roll_number}{student.section_name ? ` · ${student.section_name}` : ''}</small></td><td>{student.guardian_name || '—'}<small className="cell-subtitle">{student.guardian_phone || ''}</small></td><td><span className={`student-status status-${student.status}`}>{student.status}</span></td><td className="row-actions"><button onClick={() => editStudent(student)}>Edit</button><button className={student.status === 'active' ? 'danger-text' : ''} onClick={() => void setStudentStatus(student)}>{student.status === 'active' ? 'Mark inactive' : 'Activate'}</button></td></tr>)}</tbody></table></div>}
+      {formOpen && <form className="student-form student-editor" onSubmit={submit}><div className="student-form-heading"><div><strong>{editing ? `Edit ${editing.full_name}` : 'Enroll a student'}</strong><small>Required fields are marked with an asterisk.</small></div><button type="button" aria-label="Close form" className="icon-button" onClick={closeForm}><X size={16} /></button></div>
+        <h3>Student and class details</h3><div className="student-form-grid">
+        <label>Student name *<input required maxLength={120} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
+        <label>Student ID *<input required maxLength={40} value={form.studentCode} onChange={(e) => setForm({ ...form, studentCode: e.target.value })} /></label>
+        <label>Roll number *<input required maxLength={30} value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} /></label>
+        <label>Class *<select required value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value, sectionId: '' })}><option value="">Choose a class</option>{classes.filter((entry) => entry.status !== 'inactive' || entry.id === editing?.class_id).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}{entry.status === 'inactive' ? ' (inactive)' : ''}</option>)}</select></label>
+        <label>House / section<select value={form.sectionId} disabled={!form.classId} onChange={(e) => setForm({ ...form, sectionId: e.target.value })}><option value="">No house assigned</option>{sections.filter((section) => section.class_id === form.classId && (section.status === 'active' || section.id === editing?.section_id)).map((section) => <option key={section.id} value={section.id}>{section.name}{section.nickname ? ` · ${section.nickname}` : ''}</option>)}</select></label>
+        <label>Group<select value={form.groupName} onChange={(e) => setForm({ ...form, groupName: e.target.value })}><option>Common</option><option>Science</option><option>Humanities</option><option>Business Studies</option></select></label>
+        <label>Name in Bangla<input maxLength={120} value={form.fullNameBn} onChange={(e) => setForm({ ...form, fullNameBn: e.target.value })} /></label>
+        <label>Nickname <span className="optional-label">Optional</span><input maxLength={60} value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} /></label>
+        <label>Date of birth<input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} /></label>
+        <label>Gender<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">Not set</option><option>Male</option><option>Female</option><option>Other</option></select></label>
+        <label>Blood group<select value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not set</option>{['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((group) => <option key={group}>{group}</option>)}</select></label>
+        <label>Religion<select value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })}><option value="">Not set</option>{['Islam', 'Hinduism', 'Christianity', 'Buddhism', 'Others'].map((religion) => <option key={religion}>{religion}</option>)}</select></label>
+      </div>
+      <h3>Family and contact</h3><div className="student-form-grid"><label>Father’s name<input maxLength={120} value={form.fatherName} onChange={(e) => setForm({ ...form, fatherName: e.target.value })} /></label><label>Father’s phone<input type="tel" maxLength={32} value={form.fatherPhone} onChange={(e) => setForm({ ...form, fatherPhone: e.target.value })} /></label><label>Mother’s name<input maxLength={120} value={form.motherName} onChange={(e) => setForm({ ...form, motherName: e.target.value })} /></label><label>Mother’s phone<input type="tel" maxLength={32} value={form.motherPhone} onChange={(e) => setForm({ ...form, motherPhone: e.target.value })} /></label><label>Guardian name<input maxLength={120} value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} /></label><label>Guardian phone<input type="tel" maxLength={32} value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} /></label><label>Student phone<input type="tel" maxLength={32} value={form.studentPhone} onChange={(e) => setForm({ ...form, studentPhone: e.target.value })} /></label><label>Student email<input type="email" maxLength={254} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label></div>
+      <details className="student-extra-fields"><summary>Admission and address details</summary><div className="student-form-grid"><label>Birth certificate number<input maxLength={50} value={form.birthCertificateNumber} onChange={(e) => setForm({ ...form, birthCertificateNumber: e.target.value })} /></label><label>Previous institute<input maxLength={120} value={form.previousInstituteName} onChange={(e) => setForm({ ...form, previousInstituteName: e.target.value })} /></label><label>Session<input maxLength={20} value={form.session} onChange={(e) => setForm({ ...form, session: e.target.value })} placeholder="e.g. 2026–2027" /></label><label>Present village<input maxLength={120} value={form.presentVillage} onChange={(e) => setForm({ ...form, presentVillage: e.target.value })} /></label><label>Present district<input maxLength={80} value={form.presentDistrict} onChange={(e) => setForm({ ...form, presentDistrict: e.target.value })} /></label><label>Present thana<input maxLength={80} value={form.presentThana} onChange={(e) => setForm({ ...form, presentThana: e.target.value })} /></label><label>Present post office<input maxLength={100} value={form.presentPostOffice} onChange={(e) => setForm({ ...form, presentPostOffice: e.target.value })} /></label><label>Present holding number<input maxLength={60} value={form.presentHolding} onChange={(e) => setForm({ ...form, presentHolding: e.target.value })} /></label><label>Permanent village<input maxLength={120} value={form.permanentVillage} onChange={(e) => setForm({ ...form, permanentVillage: e.target.value })} /></label><label>Permanent district<input maxLength={80} value={form.permanentDistrict} onChange={(e) => setForm({ ...form, permanentDistrict: e.target.value })} /></label><label>Permanent thana<input maxLength={80} value={form.permanentThana} onChange={(e) => setForm({ ...form, permanentThana: e.target.value })} /></label><label>Permanent post office<input maxLength={100} value={form.permanentPostOffice} onChange={(e) => setForm({ ...form, permanentPostOffice: e.target.value })} /></label><label>Permanent holding number<input maxLength={60} value={form.permanentHolding} onChange={(e) => setForm({ ...form, permanentHolding: e.target.value })} /></label></div></details>
+      <div className="student-form-actions"><button className="primary-button" disabled={saving || classes.length === 0}>{saving ? 'Saving…' : editing ? 'Save student record' : 'Enroll student'}</button><button type="button" className="quiet-button" onClick={closeForm}>Cancel</button>{classes.length === 0 && <button type="button" className="text-action" onClick={() => onNavigate('classes')}>Create a class first</button>}</div></form>}
+      {loading ? <div className="data-empty">Loading student records…</div> : students.length === 0 ? <div className="data-empty"><span className="empty-icon"><Users size={20} /></span><strong>No students found</strong><p>{search || classFilter || sectionFilter || groupFilter ? 'Adjust your filters or search for another student.' : classes.length ? 'Add a student to begin your directory.' : 'Create at least one class before enrolling students.'}</p>{!classes.length && <button className="text-action" onClick={() => onNavigate('classes')}>Go to classes</button>}</div> : <div className="table-scroll"><table className="data-table student-table"><thead><tr><th><input aria-label="Select all students" type="checkbox" checked={students.length > 0 && students.every((student) => selectedIds.includes(student.id))} onChange={(event) => setSelectedIds(event.target.checked ? students.map((student) => student.id) : [])} /></th><th>Student ID</th><th>Roll</th><th>Student</th><th>Class / house</th><th>Group</th><th>Mobile</th><th>Status</th><th>Actions</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td><input aria-label={`Select ${student.full_name}`} type="checkbox" checked={selectedIds.includes(student.id)} onChange={(event) => setSelectedIds(event.target.checked ? [...selectedIds, student.id] : selectedIds.filter((id) => id !== student.id))} /></td><td><strong>{student.student_code}</strong></td><td>{student.roll_number}</td><td><strong>{student.full_name}</strong>{student.full_name_bn && <small className="cell-subtitle">{student.full_name_bn}</small>}{student.nickname && <small className="cell-subtitle">Badge: {student.nickname}</small>}</td><td>{student.class_name}<small className="cell-subtitle">{student.section_name || 'No house assigned'}</small></td><td>{student.group_name || 'Common'}</td><td>{student.student_phone || student.guardian_phone || '—'}<small className="cell-subtitle">{student.guardian_name || ''}</small></td><td><span className={`student-status status-${student.status}`}>{student.status}</span></td><td className="row-actions"><button aria-label={`View ${student.full_name}`} onClick={() => setViewing(student)}><Eye size={14} /></button><button onClick={() => editStudent(student)}>Edit</button><button className={student.status === 'active' ? 'danger-text' : ''} onClick={() => void setStudentStatus(student)}>{student.status === 'active' ? 'Inactive' : 'Activate'}</button></td></tr>)}</tbody></table></div>}
+      {viewing && <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewing(null) }}><section className="teacher-dialog student-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="student-profile-title"><div className="student-form-heading"><div><div className="student-profile-kicker">STUDENT PROFILE · {viewing.student_code}</div><h2 id="student-profile-title">{viewing.full_name}</h2><p>{viewing.class_name} · Roll {viewing.roll_number}{viewing.section_name ? ` · ${viewing.section_name}` : ''}</p></div><button aria-label="Close profile" className="icon-button" onClick={() => setViewing(null)}><X size={16} /></button></div><div className="student-details-grid"><div><small>Status</small><strong>{viewing.status}</strong></div><div><small>Group</small><strong>{viewing.group_name || 'Common'}</strong></div><div><small>Name in Bangla</small><strong>{viewing.full_name_bn || '—'}</strong></div><div><small>Date of birth</small><strong>{viewing.date_of_birth || '—'}</strong></div><div><small>Gender · blood group</small><strong>{[viewing.gender, viewing.blood_group].filter(Boolean).join(' · ') || '—'}</strong></div><div><small>Religion</small><strong>{viewing.religion || '—'}</strong></div><div><small>Student phone / email</small><strong>{[viewing.student_phone, viewing.email].filter(Boolean).join(' · ') || '—'}</strong></div><div><small>Guardian</small><strong>{viewing.guardian_name || '—'}{viewing.guardian_phone ? ` · ${viewing.guardian_phone}` : ''}</strong></div><div><small>Father</small><strong>{viewing.father_name || '—'}{viewing.father_phone ? ` · ${viewing.father_phone}` : ''}</strong></div><div><small>Mother</small><strong>{viewing.mother_name || '—'}{viewing.mother_phone ? ` · ${viewing.mother_phone}` : ''}</strong></div><div><small>Birth certificate</small><strong>{viewing.birth_certificate_number || '—'}</strong></div><div><small>Previous institute · session</small><strong>{[viewing.previous_institute_name, viewing.session].filter(Boolean).join(' · ') || '—'}</strong></div><div><small>Present address</small><strong>{[viewing.present_holding, viewing.present_village, viewing.present_thana, viewing.present_district].filter(Boolean).join(', ') || '—'}</strong></div><div><small>Permanent address</small><strong>{[viewing.permanent_holding, viewing.permanent_village, viewing.permanent_thana, viewing.permanent_district].filter(Boolean).join(', ') || '—'}</strong></div></div><div className="student-form-actions"><button className="primary-button" onClick={() => { const current = viewing; setViewing(null); editStudent(current) }}>Edit student</button><button className="quiet-button" onClick={() => setViewing(null)}>Close</button></div></section></div>}
     </div>
   </section>
 }

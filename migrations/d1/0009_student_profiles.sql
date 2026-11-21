@@ -1,0 +1,27 @@
+ALTER TABLE students ADD COLUMN gender TEXT;
+ALTER TABLE students ADD COLUMN father_name TEXT;
+ALTER TABLE students ADD COLUMN father_phone TEXT;
+ALTER TABLE students ADD COLUMN mother_name TEXT;
+ALTER TABLE students ADD COLUMN mother_phone TEXT;
+ALTER TABLE students ADD COLUMN student_phone TEXT;
+ALTER TABLE students ADD COLUMN email TEXT;
+ALTER TABLE students ADD COLUMN nickname TEXT;
+ALTER TABLE students ADD COLUMN blood_group TEXT;
+ALTER TABLE students ADD COLUMN religion TEXT;
+ALTER TABLE students ADD COLUMN group_name TEXT NOT NULL DEFAULT 'Common';
+ALTER TABLE students ADD COLUMN birth_certificate_number TEXT;
+ALTER TABLE students ADD COLUMN previous_institute_name TEXT;
+ALTER TABLE students ADD COLUMN session TEXT;
+ALTER TABLE students ADD COLUMN present_village TEXT;
+ALTER TABLE students ADD COLUMN present_district TEXT;
+ALTER TABLE students ADD COLUMN present_thana TEXT;
+ALTER TABLE students ADD COLUMN present_post_office TEXT;
+ALTER TABLE students ADD COLUMN present_holding TEXT;
+ALTER TABLE students ADD COLUMN permanent_village TEXT;
+ALTER TABLE students ADD COLUMN permanent_district TEXT;
+ALTER TABLE students ADD COLUMN permanent_thana TEXT;
+ALTER TABLE students ADD COLUMN permanent_post_office TEXT;
+ALTER TABLE students ADD COLUMN permanent_holding TEXT;
+
+CREATE INDEX IF NOT EXISTS students_school_house_idx ON students (school_id, section_id, status);
+CREATE INDEX IF NOT EXISTS students_school_group_idx ON students (school_id, group_name, status);
