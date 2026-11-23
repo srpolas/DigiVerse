@@ -86,6 +86,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .bind(allowed.schoolId, id, ...classIds).all<{ class_id: string }>()
   if (priorAssignments.length) {
     const removeIds = priorAssignments.map((row) => row.class_id)
+    for (const classId of removeIds) statements.push(env.CONTROL_DB.prepare(`DELETE FROM student_subjects WHERE school_id = ? AND subject_id = ? AND student_id IN (SELECT id FROM students WHERE school_id = ? AND class_id = ?)`).bind(allowed.schoolId, id, allowed.schoolId, classId))
     statements.push(env.CONTROL_DB.prepare(`DELETE FROM subject_classes WHERE school_id = ? AND subject_id = ? AND class_id IN (${removeIds.map(() => '?').join(', ')})`).bind(allowed.schoolId, id, ...removeIds))
   }
   for (const classId of classIds) statements.push(env.CONTROL_DB.prepare(`INSERT INTO subject_classes (id, school_id, class_id, subject_id, teacher_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT (school_id, class_id, subject_id) DO UPDATE SET teacher_id = excluded.teacher_id`).bind(crypto.randomUUID(), allowed.schoolId, classId, id, teacherId || null))
