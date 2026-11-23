@@ -1,0 +1,18 @@
+ALTER TABLE students ADD COLUMN father_nid TEXT;
+ALTER TABLE students ADD COLUMN father_occupation TEXT;
+ALTER TABLE students ADD COLUMN mother_nid TEXT;
+ALTER TABLE students ADD COLUMN mother_occupation TEXT;
+ALTER TABLE students ADD COLUMN father_name_bn TEXT;
+ALTER TABLE students ADD COLUMN mother_name_bn TEXT;
+ALTER TABLE students ADD COLUMN family_yearly_income INTEGER;
+ALTER TABLE students ADD COLUMN class_registration_number TEXT;
+ALTER TABLE students ADD COLUMN board_registration TEXT;
+ALTER TABLE students ADD COLUMN board_roll TEXT;
+ALTER TABLE students ADD COLUMN public_exam_name TEXT;
+ALTER TABLE students ADD COLUMN public_exam_roll TEXT;
+ALTER TABLE students ADD COLUMN public_exam_registration_number TEXT;
+ALTER TABLE students ADD COLUMN ssc_session TEXT;
+ALTER TABLE students ADD COLUMN public_exam_gpa REAL;
+ALTER TABLE students ADD COLUMN public_exam_grade TEXT;
+ALTER TABLE students ADD COLUMN ssc_passing_year INTEGER;
+ALTER TABLE students ADD COLUMN same_as_present_address INTEGER NOT NULL DEFAULT 0 CHECK (same_as_present_address IN (0, 1));

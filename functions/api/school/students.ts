@@ -37,6 +37,14 @@ interface StudentRow {
   permanent_thana: string | null
   permanent_post_office: string | null
   permanent_holding: string | null
+  father_nid: string | null; father_occupation: string | null
+  mother_nid: string | null; mother_occupation: string | null
+  father_name_bn: string | null; mother_name_bn: string | null
+  family_yearly_income: number | null; class_registration_number: string | null
+  board_registration: string | null; board_roll: string | null; public_exam_name: string | null
+  public_exam_roll: string | null; public_exam_registration_number: string | null; ssc_session: string | null
+  public_exam_gpa: number | null; public_exam_grade: string | null; ssc_passing_year: number | null
+  same_as_present_address: number; photo_object_key: string | null
   status: 'active' | 'inactive' | 'transferred'
   class_name: string
   section_name: string | null
@@ -54,7 +62,7 @@ function clean(value: unknown, max: number) {
 }
 
 function profileFields(body: Record<string, unknown>) {
-  return {
+  const profile = {
     gender: clean(body.gender, 24), fatherName: clean(body.fatherName, 120), fatherPhone: clean(body.fatherPhone, 32),
     motherName: clean(body.motherName, 120), motherPhone: clean(body.motherPhone, 32), studentPhone: clean(body.studentPhone, 32),
     email: clean(body.email, 254).toLowerCase(), nickname: clean(body.nickname, 60), bloodGroup: clean(body.bloodGroup, 8),
@@ -64,21 +72,56 @@ function profileFields(body: Record<string, unknown>) {
     presentPostOffice: clean(body.presentPostOffice, 100), presentHolding: clean(body.presentHolding, 60),
     permanentVillage: clean(body.permanentVillage, 120), permanentDistrict: clean(body.permanentDistrict, 80), permanentThana: clean(body.permanentThana, 80),
     permanentPostOffice: clean(body.permanentPostOffice, 100), permanentHolding: clean(body.permanentHolding, 60),
+    fatherNid: clean(body.fatherNid, 40), fatherOccupation: clean(body.fatherOccupation, 100),
+    motherNid: clean(body.motherNid, 40), motherOccupation: clean(body.motherOccupation, 100),
+    fatherNameBn: clean(body.fatherNameBn, 120), motherNameBn: clean(body.motherNameBn, 120),
+    familyYearlyIncome: body.familyYearlyIncome === '' || body.familyYearlyIncome === undefined ? null : Number(body.familyYearlyIncome),
+    classRegistrationNumber: clean(body.classRegistrationNumber, 60), boardRegistration: clean(body.boardRegistration, 60),
+    boardRoll: clean(body.boardRoll, 60), publicExamName: clean(body.publicExamName, 80), publicExamRoll: clean(body.publicExamRoll, 60),
+    publicExamRegistrationNumber: clean(body.publicExamRegistrationNumber, 60), sscSession: clean(body.sscSession, 30),
+    publicExamGpa: body.publicExamGpa === '' || body.publicExamGpa === undefined ? null : Number(body.publicExamGpa),
+    publicExamGrade: clean(body.publicExamGrade, 3),
+    sscPassingYear: body.sscPassingYear === '' || body.sscPassingYear === undefined ? null : Number(body.sscPassingYear),
+    sameAsPresentAddress: body.sameAsPresentAddress === true,
   }
+  if (profile.sameAsPresentAddress) {
+    profile.permanentVillage = profile.presentVillage
+    profile.permanentDistrict = profile.presentDistrict
+    profile.permanentThana = profile.presentThana
+    profile.permanentPostOffice = profile.presentPostOffice
+    profile.permanentHolding = profile.presentHolding
+  }
+  return profile
 }
 
 const profileColumns = `gender, father_name, father_phone, mother_name, mother_phone, student_phone, email, nickname,
   blood_group, religion, group_name, birth_certificate_number, previous_institute_name, session,
   present_village, present_district, present_thana, present_post_office, present_holding,
-  permanent_village, permanent_district, permanent_thana, permanent_post_office, permanent_holding`
+  permanent_village, permanent_district, permanent_thana, permanent_post_office, permanent_holding,
+  father_nid, father_occupation, mother_nid, mother_occupation, father_name_bn, mother_name_bn,
+  family_yearly_income, class_registration_number, board_registration, board_roll, public_exam_name,
+  public_exam_roll, public_exam_registration_number, ssc_session, public_exam_gpa, public_exam_grade,
+  ssc_passing_year, same_as_present_address`
 
 function profileValues(profile: ReturnType<typeof profileFields>) {
   return [profile.gender, profile.fatherName, profile.fatherPhone, profile.motherName, profile.motherPhone,
     profile.studentPhone, profile.email, profile.nickname, profile.bloodGroup, profile.religion, profile.groupName,
     profile.birthCertificateNumber, profile.previousInstituteName, profile.session, profile.presentVillage,
     profile.presentDistrict, profile.presentThana, profile.presentPostOffice, profile.presentHolding,
-    profile.permanentVillage, profile.permanentDistrict, profile.permanentThana, profile.permanentPostOffice, profile.permanentHolding]
-    .map((value) => value || null)
+    profile.permanentVillage, profile.permanentDistrict, profile.permanentThana, profile.permanentPostOffice, profile.permanentHolding,
+    profile.fatherNid, profile.fatherOccupation, profile.motherNid, profile.motherOccupation, profile.fatherNameBn, profile.motherNameBn,
+    Number.isFinite(profile.familyYearlyIncome) ? profile.familyYearlyIncome : null, profile.classRegistrationNumber,
+    profile.boardRegistration, profile.boardRoll, profile.publicExamName, profile.publicExamRoll, profile.publicExamRegistrationNumber,
+    profile.sscSession, Number.isFinite(profile.publicExamGpa) ? profile.publicExamGpa : null, profile.publicExamGrade,
+    Number.isInteger(profile.sscPassingYear) ? profile.sscPassingYear : null, profile.sameAsPresentAddress ? 1 : 0]
+    .map((value) => value === '' || value === undefined ? null : value)
+}
+
+function validAcademicProfile(profile: ReturnType<typeof profileFields>) {
+  return (profile.familyYearlyIncome === null || (Number.isInteger(profile.familyYearlyIncome) && profile.familyYearlyIncome >= 0))
+    && (profile.publicExamGpa === null || (Number.isFinite(profile.publicExamGpa) && profile.publicExamGpa >= 0 && profile.publicExamGpa <= 5))
+    && (profile.sscPassingYear === null || (Number.isInteger(profile.sscPassingYear) && profile.sscPassingYear >= 1900 && profile.sscPassingYear <= 2100))
+    && (!profile.publicExamGrade || ['A+', 'A', 'A-', 'B', 'C', 'D', 'F'].includes(profile.publicExamGrade))
 }
 
 async function verifyClass(env: Env, schoolId: string, classId: string, sectionId: string) {
@@ -150,12 +193,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if ((activeCount?.total || 0) >= 500) return apiJson({ error: 'DigiVerse currently supports up to 500 active students per school.' }, 409)
   const id = crypto.randomUUID()
   const profile = profileFields(body)
+  if (!validAcademicProfile(profile)) return apiJson({ error: 'Check the family income, GPA, grade, and passing year values.' }, 400)
   if (profile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return apiJson({ error: 'Enter a valid student email address.' }, 400)
   try {
     await env.CONTROL_DB.prepare(`
       INSERT INTO students (id, school_id, class_id, section_id, student_code, roll_number, full_name,
         full_name_bn, date_of_birth, guardian_name, guardian_phone, ${profileColumns})
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${Array(24).fill('?').join(', ')})
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${Array(42).fill('?').join(', ')})
     `).bind(id, allowed.schoolId, classId, sectionId || null, studentCode, rollNumber, fullName,
       fullNameBn || null, dateOfBirth || null, guardianName || null, guardianPhone || null, ...profileValues(profile)).run()
   } catch (error) {
@@ -196,6 +240,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env }) => {
   const guardianPhone = clean(body.guardianPhone, 32)
   const status = clean(body.status, 16)
   const profile = profileFields(body)
+  if (!validAcademicProfile(profile)) return apiJson({ error: 'Check the family income, GPA, grade, and passing year values.' }, 400)
   if (!id || !fullName || !studentCode || !rollNumber || !classId || !['active', 'inactive', 'transferred'].includes(status)) return apiJson({ error: 'Complete the required student details.' }, 400)
   if (dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return apiJson({ error: 'Enter the date of birth in YYYY-MM-DD format.' }, 400)
   if (!await verifyClass(env, allowed.schoolId, classId, sectionId)) return apiJson({ error: 'Choose a class and section from this school.' }, 400)
@@ -213,7 +258,11 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env }) => {
         gender = ?, father_name = ?, father_phone = ?, mother_name = ?, mother_phone = ?, student_phone = ?, email = ?, nickname = ?,
         blood_group = ?, religion = ?, group_name = ?, birth_certificate_number = ?, previous_institute_name = ?, session = ?,
         present_village = ?, present_district = ?, present_thana = ?, present_post_office = ?, present_holding = ?,
-        permanent_village = ?, permanent_district = ?, permanent_thana = ?, permanent_post_office = ?, permanent_holding = ?, updated_at = datetime('now')
+        permanent_village = ?, permanent_district = ?, permanent_thana = ?, permanent_post_office = ?, permanent_holding = ?,
+        father_nid = ?, father_occupation = ?, mother_nid = ?, mother_occupation = ?, father_name_bn = ?, mother_name_bn = ?,
+        family_yearly_income = ?, class_registration_number = ?, board_registration = ?, board_roll = ?, public_exam_name = ?,
+        public_exam_roll = ?, public_exam_registration_number = ?, ssc_session = ?, public_exam_gpa = ?, public_exam_grade = ?,
+        ssc_passing_year = ?, same_as_present_address = ?, updated_at = datetime('now')
       WHERE id = ? AND school_id = ?
     `).bind(classId, sectionId || null, studentCode, rollNumber, fullName, fullNameBn || null, dateOfBirth || null,
       guardianName || null, guardianPhone || null, status, ...profileValues(profile), id, allowed.schoolId).run()
